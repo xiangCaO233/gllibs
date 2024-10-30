@@ -4,7 +4,9 @@
 #include "../gls/mesh.h"
 #include "../gls/shader.h"
 #include <string>
+#ifdef __APPLE__
 #include <vector>
+#endif //__APPLE__
 
 #ifdef __unix
 #include <thread>
@@ -46,6 +48,10 @@ class glwindow {
   static void onmousemove(GLFWwindow *window, double x, double y);
   static void onmousewheel(GLFWwindow *window, double dx, double dy);
 
+#ifdef __unix
+  void render();
+#endif //__unix
+
 protected:
   // 可覆写窗口事件
   virtual void resize_event(resizeevent *event);
@@ -54,14 +60,18 @@ protected:
   virtual void mouse_move_event(mousemoveevent *event);
   virtual void mouse_wheel_event(mousewheelevent *event);
 
-  virtual void drawframe();
+  // 绘制窗口
+  virtual void draw_frame();
 
 public:
-  // 初始化一个窗口
+  // 初始化窗口
   glwindow(int w, int h, std::string title);
-  ~glwindow();
+  virtual ~glwindow();
 
   void enable_alpha_blend();
+
+  void set_visible(bool val);
+  void set_background_color(float *color);
 
   // glfw是否初始化完成
   static bool _is_glfw_inited;
@@ -69,10 +79,14 @@ public:
   static bool _is_glew_inited;
   // 窗口指针
   GLFWwindow *window;
+  // 是否显示窗口
+  bool visible{false};
   // 着色器
-  shader _shader;
+  shader *_shader;
   // 图形数据
-  mesh _mesh;
+  mesh *_mesh;
+  // 背景颜色
+  float background_color[4]{0.23f, 0.23f, 0.23f, 1.0f};
 #ifdef __unix
   std::thread _eventloop_thread;
 #endif //__unix
