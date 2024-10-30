@@ -14,7 +14,8 @@ find_package(OpenGL REQUIRED)
 include_directories(include)
 
 set(TEST_SOURCES src/test.cpp)
-set(LIB_SOURCES src/gls/shader.cpp src/gls/shader.cpp src/gls/mesh.cpp src/gls/vertex.cpp)
+set(LIB_SOURCES src/gls/shader.cpp src/gls/shader.cpp src/gls/mesh.cpp
+                src/gls/vertex.cpp src/nwd/glwindow.cpp)
 
 add_executable(gllib_test ${TEST_SOURCES} ${LIB_SOURCES})
 add_library(gllibs STATIC ${LIB_SOURCES})

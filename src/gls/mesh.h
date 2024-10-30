@@ -50,9 +50,21 @@ public:
   void add_vertices(std::vector<vertex> &v);
   void add_vertices(std::vector<vertex> &&v);
 
+  // 移除顶点
+  void del_vertex(int index);
+  void del_vertex(vertex &v);
+
+  // 擦除一整块顶点
+  void erase_vertex(int from, int to);
+
   // 添加顶点绘制下标
   void add_element(unsigned int e);
   void add_elements(std::vector<unsigned int> &&e);
+
+  // 移除元素
+  void del_element(int index);
+  // 擦除一整块元素
+  void erase_element(int from, int to);
 };
 
 #endif // MESH_H
