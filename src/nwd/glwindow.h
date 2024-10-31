@@ -3,6 +3,8 @@
 
 #include "../gls/mesh.h"
 #include "../gls/shader.h"
+#include <condition_variable>
+#include <mutex>
 #include <string>
 #ifdef __APPLE__
 #include <vector>
@@ -35,10 +37,6 @@ struct mousewheelevent {
 };
 
 class glwindow {
-#ifdef __APPLE__
-  static std::vector<glwindow *> windows;
-  static void start_render();
-#endif //__APPLE__
   // 静态回调函数
   static void onresize(GLFWwindow *window, int w, int h);
   static void onkeyinput(GLFWwindow *window, int key, int keycode, int action,
@@ -49,16 +47,33 @@ class glwindow {
   static void onmousewheel(GLFWwindow *window, double dx, double dy);
 
 #ifdef __unix
+  // 线程锁
+  std::mutex mtx;
+  // 条件变量
+  std::condition_variable cv;
   void render();
 #endif //__unix
 
+#ifdef __APPLE__
+  // 线程锁
+  static std::mutex mtx;
+  // 条件变量
+  static std::condition_variable cv;
+  static std::vector<glwindow *> windows;
+
+  static bool shoud_render();
+
+public:
+  static void start_render();
+#endif //__APPLE__
+
 protected:
   // 可覆写窗口事件
-  virtual void resize_event(resizeevent *event);
-  virtual void key_event(keyevent *event);
-  virtual void mouse_event(mouseevent *event);
-  virtual void mouse_move_event(mousemoveevent *event);
-  virtual void mouse_wheel_event(mousewheelevent *event);
+  virtual void resize_event(resizeevent event);
+  virtual void key_event(keyevent event);
+  virtual void mouse_event(mouseevent event);
+  virtual void mouse_move_event(mousemoveevent event);
+  virtual void mouse_wheel_event(mousewheelevent event);
 
   // 绘制窗口
   virtual void draw_frame();
@@ -69,6 +84,8 @@ public:
   virtual ~glwindow();
 
   void enable_alpha_blend();
+
+  void hide();
 
   void set_visible(bool val);
   void set_background_color(float *color);
@@ -81,6 +98,8 @@ public:
   GLFWwindow *window;
   // 是否显示窗口
   bool visible{false};
+  bool gl_visible{true};
+  bool delay_visible{false};
   // 着色器
   shader *_shader;
   // 图形数据

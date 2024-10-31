@@ -16,3 +16,8 @@ std::vector<float> vertex::dump() {
   std::vector<float> standard_data = {_x, _y, _z, _r, _g, _b, _a, _u, _v};
   return standard_data;
 }
+
+bool vertex::operator==(const vertex &v) {
+  return _x == v._x && _y == v._y && _z == v._z && _r == v._r && _g == v._g &&
+         _b == v._b && _a == v._a && _u == v._u && _v == v._v;
+}

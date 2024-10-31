@@ -1,6 +1,7 @@
 #include "mesh.h"
 #include <algorithm>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -173,7 +174,7 @@ void mesh::expand_gmemory(GLenum buffer_name, float rate) {
 }
 
 // 添加顶点
-void mesh::add_vertex(vertex &v) {
+void mesh::put_vertex(vertex &v, int index) {
   // debug_vertex_data();
   auto vdata = v.dump();
   if (_vertices.size() >= _vsize - 1) {
@@ -182,19 +183,31 @@ void mesh::add_vertex(vertex &v) {
   }
   bind();
   // 更新显存
-  glBufferSubData(GL_ARRAY_BUFFER, _vertices.size() * sizeof(vertex),
-                  sizeof(vertex), vdata.data());
+  if (index == -1) {
+    // 添加到末尾
+    glBufferSubData(GL_ARRAY_BUFFER, _vertices.size() * sizeof(vertex),
+                    sizeof(vertex), vdata.data());
+    // 同步cpu侧数据
+    std::copy(vdata.begin(), vdata.end(),
+              _vertices_data.begin() + _vertices.size() * 9);
+    _vertices.push_back(v);
+  } else if (index >= 0 && index < _vertices.size()) {
+    // 添加到指定位置
+    glBufferSubData(GL_ARRAY_BUFFER, index * sizeof(vertex), sizeof(vertex),
+                    vdata.data());
+    // 同步cpu侧数据
+    std::copy(vdata.begin(), vdata.end(), _vertices_data.begin() + index * 9);
+    _vertices[index] = v;
+  } else {
+    throw std::runtime_error("index非法,顶点插入失败");
+  }
   unbind();
-  // 同步cpu侧数据
-  std::copy(vdata.begin(), vdata.end(),
-            _vertices_data.begin() + _vertices.size() * 9);
-  _vertices.push_back(v);
   // debug_vertex_data();
   // debug_gmemory();
 };
-void mesh::add_vertex(vertex &&v) { add_vertex(v); };
+void mesh::put_vertex(vertex &&v, int index) { put_vertex(v, index); };
 
-void mesh::add_vertices(std::vector<vertex> &vs) {
+void mesh::put_vertices(std::vector<vertex> &vs, int index) {
   if (vs.size() + _vertices.size() > _vsize - 1) {
     // 超出容量
     float rate =
@@ -208,17 +221,121 @@ void mesh::add_vertices(std::vector<vertex> &vs) {
     temp.insert(temp.end(), data.begin(), data.end());
   }
   bind();
-  // 更新显存
-  glBufferSubData(GL_ARRAY_BUFFER, _vertices.size() * sizeof(vertex),
-                  vs.size() * sizeof(vertex), temp.data());
+  if (index == -1) {
+    // 更新显存
+    glBufferSubData(GL_ARRAY_BUFFER, _vertices.size() * sizeof(vertex),
+                    vs.size() * sizeof(vertex), temp.data());
+    // 同步cpu侧数据
+    std::copy(temp.begin(), temp.end(),
+              _vertices_data.begin() + _vertices.size() * 9);
+    _vertices.insert(_vertices.end(), vs.begin(), vs.end());
+  } else if (index >= 0 && index < _vertices.size()) {
+    // 更新显存
+    glBufferSubData(GL_ARRAY_BUFFER, index * sizeof(vertex),
+                    vs.size() * sizeof(vertex), temp.data());
+    // 同步cpu侧数据
+    std::copy(temp.begin(), temp.end(),
+              _vertices_data.begin() + _vertices.size() * 9);
+    _vertices.insert(_vertices.end(), vs.begin(), vs.end());
+  } else {
+    throw std::runtime_error("index非法,顶点插入失败");
+  }
   unbind();
-  // 同步cpu侧数据
-  std::copy(temp.begin(), temp.end(),
-            _vertices_data.begin() + _vertices.size() * 9);
-  _vertices.insert(_vertices.end(), vs.begin(), vs.end());
 }
 
-void mesh::add_vertices(std::vector<vertex> &&vs) { add_vertices(vs); }
+void mesh::put_vertices(std::vector<vertex> &&vs, int index) {
+  put_vertices(vs, index);
+}
+
+void mesh::del_vertex(int index, bool align_mem, bool auto_elm_fix) {
+  if (index < 0 || index >= _vertices.size()) {
+    throw std::runtime_error("index非法,顶点删除失败");
+  }
+  bind();
+  if (align_mem) {
+    // 对齐内存(会影响element,会导致绘制失效,需要实时变化element数组)
+    // 处理显存
+    // 获取此顶点后面的数据
+    int after_datasize = (_vertices.size() - index - 1) * sizeof(vertex);
+    // 申请一片后面数据大小的内存
+    std::vector<char> after_data(after_datasize);
+    glGetBufferSubData(GL_ARRAY_BUFFER, (index + 1) * sizeof(vertex),
+                       after_datasize, after_data.data());
+    // 覆盖整个后部分数据
+    glBufferSubData(GL_ARRAY_BUFFER, (index) * sizeof(vertex), after_datasize,
+                    after_data.data());
+    // 将显存最后顶点内存置零
+    auto blank_gmem = std::vector<float>(9, 0.0f);
+    glBufferSubData(GL_ARRAY_BUFFER, (_vertices.size() - 1) * sizeof(vertex),
+                    sizeof(vertex), blank_gmem.data());
+
+    if (auto_elm_fix) {
+      // 修复element数组下标
+      // 将所有等于 index 的元素移到_elements末尾
+      auto _elements_new_end =
+          std::remove(_elements.begin(), _elements.end(), index);
+      // 删除的元素数量
+      int num_removed = std::distance(_elements_new_end, _elements.end());
+      // 从新结尾删除无效数据
+      _elements.erase(_elements_new_end, _elements.end());
+      // 同步cpu侧_element_data
+      auto _element_data_new_end =
+          std::remove(_element_data.begin(), _element_data.end(), index);
+      _element_data.erase(_element_data_new_end, _element_data.end());
+
+      if (auto_elm_fix) {
+        // 修复_elements和_element_data数组
+        auto fix_elements = [&](std::vector<unsigned int> &elements) {
+          auto new_end = std::remove(elements.begin(), elements.end(), index);
+          elements.erase(new_end, elements.end());
+          for (auto &ele : elements) {
+            if (ele > index)
+              --ele;
+          }
+        };
+        fix_elements(_elements);
+        fix_elements(_element_data);
+
+        // 同步显存中的elements数据
+        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0,
+                        _element_data.size() * sizeof(unsigned int),
+                        _element_data.data());
+      }
+
+      // cpu侧
+      // 擦除顶点列表中的数据
+      _vertices.erase(_vertices.begin() + index);
+
+      // 擦除顶点数据中的数据
+      _vertices_data.erase(_vertices_data.begin() + index * 9,
+                           _vertices_data.begin() + (index + 1) * 9);
+      auto blank_data = std::vector<float>(9, 0.0f);
+      // 补齐空白数据到末尾
+      _vertices_data.insert(_vertices_data.end(), blank_data.begin(),
+                            blank_data.end());
+    } else {
+      // 不对齐内存(不影响element主要绘制逻辑)
+      auto blank_data = std::vector<float>(9, 0.0f);
+      // 不擦除顶点列表中的数据
+      // 将顶点数据中的数据置零
+      std::copy(blank_data.begin(), blank_data.end(),
+                _vertices_data.begin() + index * 9);
+      // 处理显存
+      auto blank_gmem = std::vector<float>(9, 0.0f);
+      // 将指定位置的顶点数据置零
+      glBufferSubData(GL_ARRAY_BUFFER, index * sizeof(vertex), sizeof(vertex),
+                      blank_gmem.data());
+    }
+    unbind();
+  }
+}
+
+void mesh::del_vertex(vertex &v, bool align_mem, bool auto_elm_fix) {
+  auto it = std::find(_vertices.begin(), _vertices.end(), v);
+  if (it != _vertices.end()) {
+    del_vertex(std::distance(_vertices.begin(), it), align_mem, auto_elm_fix);
+  }
+}
 
 // 添加顶点绘制下标
 void mesh::add_element(unsigned int e) {
@@ -238,24 +355,106 @@ void mesh::add_element(unsigned int e) {
   _elements.push_back(e);
   // debug_gememory();
 };
-void mesh::add_elements(std::vector<unsigned int> &&e) {
+void mesh::add_elements(std::vector<unsigned int> &&es) {
   // debug_gememory();
   // debug_element_data();
-  if (e.size() + _elements.size() > _esize - 1) {
+  if (es.size() + _elements.size() > _esize - 1) {
     // 超出容量
     float rate =
-        (float)(e.size() + _elements.size()) / (float)(_elements.size()) + 0.5f;
+        (float)(es.size() + _elements.size()) / (float)(_elements.size()) +
+        0.5f;
     expand_gmemory(GL_ELEMENT_ARRAY_BUFFER, rate);
   }
   bind();
   // 更新显存
   glBufferSubData(GL_ELEMENT_ARRAY_BUFFER,
                   _elements.size() * sizeof(unsigned int),
-                  e.size() * sizeof(unsigned int), e.data());
+                  es.size() * sizeof(unsigned int), es.data());
   unbind();
   // 同步cpu侧数据
-  std::copy(e.begin(), e.end(), _element_data.begin() + _elements.size());
-  _elements.insert(_elements.end(), e.begin(), e.end());
+  std::copy(es.begin(), es.end(), _element_data.begin() + _elements.size());
+  _elements.insert(_elements.end(), es.begin(), es.end());
   // debug_element_data();
   // debug_gememory();
 };
+
+void mesh::insert_element(int index, unsigned int e) {
+  if (_elements.size() >= _esize - 1) {
+    // 括申显存
+    expand_gmemory(GL_ELEMENT_ARRAY_BUFFER, 1.5f);
+  }
+  // 同步cpu侧数据
+  _element_data.insert(_element_data.begin() + index, e);
+  _elements.insert(_elements.begin() + index, e);
+  // 移动显存后续数据
+  bind();
+  glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, index * sizeof(unsigned int),
+                  (_element_data.size() - index) * sizeof(unsigned int),
+                  _element_data.data() + index);
+  unbind();
+};
+void mesh::insert_elements(int index, std::vector<unsigned int> &&es) {
+  if (es.size() + _elements.size() > _esize - 1) {
+    // 超出容量
+    float rate =
+        (float)(es.size() + _elements.size()) / (float)(_elements.size()) +
+        0.5f;
+    expand_gmemory(GL_ELEMENT_ARRAY_BUFFER, rate);
+  }
+  // 同步cpu侧数据
+
+  _element_data.insert(_element_data.begin() + index, es.begin(), es.end());
+  for (int i = 0; i < es.size(); i++)
+    _element_data.pop_back();
+  _elements.insert(_elements.end(), es.begin(), es.end());
+  bind();
+  // 更新显存
+  glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, index * sizeof(unsigned int),
+                  (_element_data.size() - index) * sizeof(unsigned int),
+                  _element_data.data() + index);
+  unbind();
+};
+void mesh::insert_elements(int index, std::vector<unsigned int> &es) {
+  insert_elements(index, es);
+};
+
+void mesh::del_element(int index) {
+  if (index < 0 || index >= _elements.size())
+    throw std::runtime_error("元素下标非法,删除失败");
+  bind();
+  // 处理显存数据
+  int after_data_size = (_elements.size() - index - 1) * sizeof(unsigned int);
+  std::vector<char> after_data(after_data_size);
+  // 获取显存数据
+  glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER,
+                     (index + 1) * sizeof(unsigned int), after_data_size,
+                     after_data.data());
+  // 更新显存
+  glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, index * sizeof(unsigned int),
+                  after_data_size, after_data.data());
+  unbind();
+  // 同步cpu侧数据
+  _element_data.erase(_element_data.begin() + index);
+  _elements.erase(_elements.begin() + index);
+}
+
+void mesh::erase_element(int from, int to) {
+  if (from < 0 || to >= _elements.size() || from > to)
+    throw std::runtime_error("元素下标非法,删除失败");
+  // 处理显存数据
+  int after_data_size = (_elements.size() - to - 1) * sizeof(unsigned int);
+  std::vector<char> after_data(after_data_size);
+  if (to < _elements.size() - 1) {
+    bind();
+    // 获取显存数据
+    glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, (to + 1) * sizeof(unsigned int),
+                       after_data_size, after_data.data());
+    // 更新显存
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, from * sizeof(unsigned int),
+                    after_data_size, after_data.data());
+    unbind();
+  }
+  // 同步cpu侧数据
+  _element_data.erase(_element_data.begin() + from, _element_data.begin() + to);
+  _elements.erase(_elements.begin() + from, _elements.begin() + to);
+}

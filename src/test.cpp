@@ -1,4 +1,28 @@
 #include "nwd/glwindow.h"
+#include <iostream>
+#include <thread>
+#include <unistd.h>
+
+#ifdef __APPLE__
+glwindow *w;
+
+void moved_main() {
+
+  std::cout << "设置窗口可见" << std::endl;
+  usleep(1000000 * 2);
+  w->set_visible(true);
+  usleep(1000000 * 2);
+  w->set_visible(false);
+  usleep(1000000 * 2);
+  w->set_visible(true);
+  usleep(1000000 * 2);
+  w->set_visible(false);
+  usleep(1000000 * 2);
+  w->set_visible(true);
+  usleep(1000000 * 2);
+  w->set_visible(false);
+}
+#endif //__APPLE__
 
 int main() {
   // shader s("../assets/shader/vertex.glsl", "../assets/shader/fragment.glsl");
@@ -36,9 +60,17 @@ int main() {
   // ms.add_elements({0, 1, 2, 3, 6, 4, 5, 1, 3});
   // ms.add_elements({0, 1, 2, 3, 6, 4, 5, 1, 3});
   // ms.add_elements({0, 1, 2, 3, 6, 4, 5, 1, 3});
+#ifdef __APPLE__
+  std::cout << "创建窗口" << std::endl;
+  w = new glwindow(800, 600, "test");
 
-  glwindow w(800, 600, "test");
-  w.set_visible(true);
+  // 主线程必须堵塞,转移main到moved_main中运行
+  std::thread t(&moved_main);
+  t.detach();
+
+  // 启动渲染循环
+  glwindow::start_render();
+#endif //__APPLE__
   //    std::cout << "vertex size" << std::to_string(sizeof(vertex)) <<
   //    std::endl; char line[512]; while (true) {
   //      std::cin.getline(line, 512);

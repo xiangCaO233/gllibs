@@ -1,15 +1,27 @@
 #include "glwindow.h"
+#include "../gls/glcore.h"
+#include <iostream>
 #include <stdexcept>
+#include <string>
+#include <thread>
+#include <unistd.h>
+#include <vector>
 
 bool glwindow::_is_glfw_inited = false;
 bool glwindow::_is_glew_inited = false;
 
+#ifdef __APPLE__
+std::vector<glwindow *> glwindow::windows;
+std::mutex glwindow::mtx;
+std::condition_variable glwindow::cv;
+#endif //__APPLE__
+
 void glwindow::onresize(GLFWwindow *window, int w, int h) {
   glViewport(0, 0, w, h);
-  resizeevent *event;
-  event->window = window;
-  event->w = w;
-  event->h = h;
+  resizeevent event;
+  event.window = window;
+  event.w = w;
+  event.h = h;
   // 获取用户实例指针
   glwindow *instance =
       static_cast<glwindow *>(glfwGetWindowUserPointer(window));
@@ -21,12 +33,12 @@ void glwindow::onresize(GLFWwindow *window, int w, int h) {
 
 void glwindow::onkeyinput(GLFWwindow *window, int key, int keycode, int action,
                           int mods) {
-  keyevent *event;
-  event->window = window;
-  event->key = key;
-  event->keycode = keycode;
-  event->action = action;
-  event->mods = mods;
+  keyevent event;
+  event.window = window;
+  event.key = key;
+  event.keycode = keycode;
+  event.action = action;
+  event.mods = mods;
   // 获取用户实例指针
   glwindow *instance =
       static_cast<glwindow *>(glfwGetWindowUserPointer(window));
@@ -38,11 +50,11 @@ void glwindow::onkeyinput(GLFWwindow *window, int key, int keycode, int action,
 
 void glwindow::onmouseinput(GLFWwindow *window, int button, int action,
                             int mods) {
-  mouseevent *event;
-  event->window = window;
-  event->button = button;
-  event->action = action;
-  event->mods = mods;
+  mouseevent event;
+  event.window = window;
+  event.button = button;
+  event.action = action;
+  event.mods = mods;
   // 获取用户实例指针
   glwindow *instance =
       static_cast<glwindow *>(glfwGetWindowUserPointer(window));
@@ -53,10 +65,10 @@ void glwindow::onmouseinput(GLFWwindow *window, int button, int action,
 };
 
 void glwindow::onmousemove(GLFWwindow *window, double x, double y) {
-  mousemoveevent *event;
-  event->window = window;
-  event->x = x;
-  event->y = y;
+  mousemoveevent event;
+  event.window = window;
+  event.x = x;
+  event.y = y;
   // 获取用户实例指针
   glwindow *instance =
       static_cast<glwindow *>(glfwGetWindowUserPointer(window));
@@ -66,10 +78,10 @@ void glwindow::onmousemove(GLFWwindow *window, double x, double y) {
   }
 };
 void glwindow::onmousewheel(GLFWwindow *window, double dx, double dy) {
-  mousewheelevent *event;
-  event->window = window;
-  event->dx = dx;
-  event->dy = dy;
+  mousewheelevent event;
+  event.window = window;
+  event.dx = dx;
+  event.dy = dy;
   // 获取用户实例指针
   glwindow *instance =
       static_cast<glwindow *>(glfwGetWindowUserPointer(window));
@@ -82,21 +94,63 @@ void glwindow::onmousewheel(GLFWwindow *window, double dx, double dy) {
 #ifdef __APPLE__
 void glwindow::start_render() {
   while (true) {
+    std::unique_lock<std::mutex> lock(mtx);
+    // std::cout << "等待渲染" << std::endl;
+    //    等待渲染窗口
+    cv.wait(lock, []() { return shoud_render(); });
     for (auto w : windows) {
-      if (w->visible) {
-        // 获取用户实例指针
-        glwindow *instance =
-            static_cast<glwindow *>(glfwGetWindowUserPointer(window));
-        if (instance) {
-          glfwMakeContextCurrent(window);
-          // 绘制窗口
-          glwindow->draw_frame();
+      // 防死机机制
+      if ((w->visible || w->delay_visible) &&
+          !glfwWindowShouldClose(w->window)) {
+        // 更改窗口可见性
+        if (!w->visible) {
+          glfwHideWindow(w->window);
+          w->gl_visible = false;
+        } else if (!w->gl_visible) {
+          glfwShowWindow(w->window);
+          w->gl_visible = true;
         }
+        // std::cout << "开始渲染" << std::endl;
+        glfwMakeContextCurrent(w->window);
+        // 绘制背景颜色
+        glClearColor(w->background_color[0], w->background_color[1],
+                     w->background_color[2], w->background_color[3]);
+        glClear(GL_COLOR_BUFFER_BIT);
+        w->_shader->use();
+        w->_mesh->bind();
+        // 绘制内容
+        w->draw_frame();
+        w->_mesh->unbind();
+        w->_shader->unuse();
+
+        glfwSwapBuffers(w->window);
+      } else {
+        glfwHideWindow(w->window);
+        w->gl_visible = false;
+        std::thread t([&]() {
+          // 防止未响应
+          usleep(100000);
+          w->set_visible(false);
+        });
+        t.detach();
       }
+      glfwPollEvents();
     }
   }
 }
+
+// 检查是否需要渲染窗口
+bool glwindow::shoud_render() {
+  for (auto w : windows) {
+    if (w->visible || w->delay_visible) {
+      return true;
+    }
+  }
+  return false;
+}
 #endif //__APPLE__
+
+void glwindow::hide() { glfwHideWindow(window); }
 
 // 构造函数
 glwindow::glwindow(int w, int h, std::string title) {
@@ -147,7 +201,7 @@ glwindow::glwindow(int w, int h, std::string title) {
   glfwSetScrollCallback(window, onmousewheel);
 
 #ifdef __APPLE__
-  windows.push_back(window);
+  windows.push_back(this);
 #endif //__APPLE__
   // linux使用多线程
 #ifdef __unix
@@ -161,7 +215,17 @@ glwindow::~glwindow() {
   delete _shader;
   delete _mesh;
 }
-void glwindow::set_visible(bool val) { visible = val; }
+void glwindow::set_visible(bool val) {
+  // std::cout << "设置可见性[" + std::to_string(val) + "]" << std::endl;
+  visible = val;
+  std::thread t([this]() {
+    usleep(100000);
+    delay_visible = visible;
+  });
+  t.detach();
+  // 通知线程
+  cv.notify_all();
+}
 
 void glwindow::enable_alpha_blend() {
   if (!_is_glfw_inited || !_is_glew_inited) {
@@ -175,30 +239,30 @@ void glwindow::enable_alpha_blend() {
 #ifdef __unix
 void glwindow::render() {
   while (visible) {
-    //  glfwMakeContextCurrent(window);
+    glfwMakeContextCurrent(window);
     // 绘制背景颜色
     glClearColor(background_color[0], background_color[1], background_color[2],
                  background_color[3]);
-    // glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT);
 
-    //_shader->use();
-    //_mesh->bind();
+    _shader->use();
+    _mesh->bind();
     // 绘制内容
-    // draw_frame();
+    draw_frame();
 
-    //_mesh->unbind();
-    //_shader->unuse();
+    _mesh->unbind();
+    _shader->unuse();
 
-    // glfwSwapBuffers(window);
-    // glfwPollEvents();
+    glfwSwapBuffers(window);
+    glfwPollEvents();
   }
 };
 #endif //__unix
 
 void glwindow::draw_frame() {}
 
-void glwindow::resize_event(resizeevent *event) {}
-void glwindow::key_event(keyevent *event) {}
-void glwindow::mouse_event(mouseevent *event) {}
-void glwindow::mouse_move_event(mousemoveevent *event) {}
-void glwindow::mouse_wheel_event(mousewheelevent *event) {}
+void glwindow::resize_event(resizeevent event) {}
+void glwindow::key_event(keyevent event) {}
+void glwindow::mouse_event(mouseevent event) {}
+void glwindow::mouse_move_event(mousemoveevent event) {}
+void glwindow::mouse_wheel_event(mousewheelevent event) {}

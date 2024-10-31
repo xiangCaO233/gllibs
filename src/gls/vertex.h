@@ -21,6 +21,8 @@ public:
   std::vector<float> dump();
 
   void register_data(std::string name, float val);
+
+  bool operator==(const vertex &v);
 };
 
 #endif // VERTEX_H

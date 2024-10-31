@@ -45,21 +45,24 @@ public:
   void expand_gmemory(GLenum buffer_name, float rate);
 
   // 添加顶点
-  void add_vertex(vertex &v);
-  void add_vertex(vertex &&v);
-  void add_vertices(std::vector<vertex> &v);
-  void add_vertices(std::vector<vertex> &&v);
+  void put_vertex(vertex &v, int index = -1);
+  void put_vertex(vertex &&v, int index = -1);
+  void put_vertices(std::vector<vertex> &v, int index = -1);
+  void put_vertices(std::vector<vertex> &&v, int index = -1);
 
   // 移除顶点
-  void del_vertex(int index);
-  void del_vertex(vertex &v);
+  void del_vertex(int index, bool align_mem = true, bool auto_elm_fix = true);
+  void del_vertex(vertex &v, bool align_mem = true, bool auto_elm_fix = true);
 
   // 擦除一整块顶点
   void erase_vertex(int from, int to);
 
   // 添加顶点绘制下标
   void add_element(unsigned int e);
-  void add_elements(std::vector<unsigned int> &&e);
+  void add_elements(std::vector<unsigned int> &&es);
+  void insert_element(int index, unsigned int e);
+  void insert_elements(int index, std::vector<unsigned int> &es);
+  void insert_elements(int index, std::vector<unsigned int> &&es);
 
   // 移除元素
   void del_element(int index);
