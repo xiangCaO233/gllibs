@@ -1,4 +1,5 @@
 #include "nwd/glwindow.h"
+#include <cstdio>
 #include <iostream>
 #include <ostream>
 #include <string>
@@ -76,4 +77,23 @@ int main() {
   // 启动渲染循环
   glwindow::start_render();
 #endif //__APPLE__
+
+#ifdef __unix
+  mywindow *w = new mywindow(800, 600, "test");
+  // 获取gl上下文
+  w->getglcontext();
+  // 向mesh添加三个顶点(x,y,z,r,g,b,a)
+  w->_mesh->put_vertices({{-0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
+                          {0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f},
+                          {0.0f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f}});
+  // 添加绘制元素下标(0,1,2)前三个顶点
+  w->_mesh->add_elements({0, 1, 2});
+  // 释放gl上下文
+  w->releaseglcontext();
+  w->set_visible(true);
+  // usleep(1000000 * 2);
+  // w->set_visible(false);
+
+  getchar();
+#endif //__unix
 }

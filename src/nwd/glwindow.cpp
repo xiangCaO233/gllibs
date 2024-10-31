@@ -1,6 +1,8 @@
 #include "glwindow.h"
 #include "../gls/glcore.h"
+#include <GLFW/glfw3.h>
 #include <iostream>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -205,7 +207,10 @@ glwindow::glwindow(int w, int h, std::string title) {
 #endif //__APPLE__
   // linux使用多线程
 #ifdef __unix
+  // linux需要从主线程释放gl上下文以便各线程绑定渲染
+  glfwMakeContextCurrent(nullptr);
   _eventloop_thread = std::thread(&glwindow::render, this);
+  std::cout << "启动渲染线程" << std::endl;
   _eventloop_thread.detach();
 #endif //__unix
 }
@@ -239,25 +244,35 @@ void glwindow::enable_alpha_blend() {
 // linux线程函数
 #ifdef __unix
 void glwindow::render() {
-  while (visible) {
+  while (true) {
+    std::unique_lock<std::mutex> lock(mtx);
+    cv.wait(lock, [this]() { return visible; });
     glfwMakeContextCurrent(window);
-    // 绘制背景颜色
-    glClearColor(background_color[0], background_color[1], background_color[2],
-                 background_color[3]);
-    glClear(GL_COLOR_BUFFER_BIT);
+    while (visible && !glfwWindowShouldClose(window)) {
+      // 绘制背景颜色
+      glClearColor(background_color[0], background_color[1],
+                   background_color[2], background_color[3]);
+      glClear(GL_COLOR_BUFFER_BIT);
 
-    _shader->use();
-    _mesh->bind();
-    // 绘制内容
-    draw_frame();
+      _shader->use();
+      _mesh->bind();
+      // 绘制内容
+      draw_frame();
 
-    _mesh->unbind();
-    _shader->unuse();
+      _mesh->unbind();
+      _shader->unuse();
 
-    glfwSwapBuffers(window);
+      glfwSwapBuffers(window);
+      glfwPollEvents();
+    }
+    // 关闭窗口后再隐藏一次窗口并完成一次事件循环保证生效
+    glfwHideWindow(window);
     glfwPollEvents();
+    glfwMakeContextCurrent(nullptr);
   }
 };
+void glwindow::getglcontext() { glfwMakeContextCurrent(window); };
+void glwindow::releaseglcontext() { glfwMakeContextCurrent(nullptr); };
 #endif //__unix
 
 void glwindow::draw_frame() {}
