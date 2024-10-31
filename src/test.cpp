@@ -1,6 +1,9 @@
 #include "nwd/glwindow.h"
 #include <cstdio>
+#include <cstdlib>
+#include <ctime>
 #include <iostream>
+#include <mutex>
 #include <ostream>
 #include <string>
 #include <thread>
@@ -79,17 +82,44 @@ int main() {
 #endif //__APPLE__
 
 #ifdef __unix
+  srand(time(nullptr));
   mywindow *w = new mywindow(800, 600, "test");
   // 获取gl上下文
   w->getglcontext();
   // 向mesh添加三个顶点(x,y,z,r,g,b,a)
-  w->_mesh->put_vertices({{-0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
-                          {0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f},
-                          {0.0f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f}});
+  w->_mesh->put_vertices({
+      {-1.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
+      {1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f},
+      {1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f},
+      {-1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f},
+  });
   // 添加绘制元素下标(0,1,2)前三个顶点
-  w->_mesh->add_elements({0, 1, 2});
+  w->_mesh->add_elements({0, 1, 2, 0, 2, 3});
   // 释放gl上下文
   w->releaseglcontext();
+  // 创建共享的OpenGL上下文
+  GLFWwindow *sharedContext = glfwCreateWindow(1, 1, "", nullptr, w->window);
+  glfwHideWindow(sharedContext);
+  std::thread update_thread([&]() {
+    while (true) {
+      usleep(1000 * 16);
+      glfwMakeContextCurrent(sharedContext);
+      w->_mesh->update_vertex_color(0, (rand() % 1000) / 1000.0f,
+                                    (rand() % 1000) / 1000.0f,
+                                    (rand() % 1000) / 1000.0f, 1.0f);
+      w->_mesh->update_vertex_color(1, (rand() % 1000) / 1000.0f,
+                                    (rand() % 1000) / 1000.0f,
+                                    (rand() % 1000) / 1000.0f, 1.0f);
+      w->_mesh->update_vertex_color(2, (rand() % 1000) / 1000.0f,
+                                    (rand() % 1000) / 1000.0f,
+                                    (rand() % 1000) / 1000.0f, 1.0f);
+      w->_mesh->update_vertex_color(3, (rand() % 1000) / 1000.0f,
+                                    (rand() % 1000) / 1000.0f,
+                                    (rand() % 1000) / 1000.0f, 1.0f);
+      glfwMakeContextCurrent(nullptr);
+    }
+  });
+  update_thread.detach();
   w->set_visible(true);
   // usleep(1000000 * 2);
   // w->set_visible(false);

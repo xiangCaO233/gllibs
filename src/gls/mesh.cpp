@@ -247,6 +247,61 @@ void mesh::put_vertices(std::vector<vertex> &&vs, int index) {
   put_vertices(vs, index);
 }
 
+// 更新顶点数据
+void mesh::update_vertex_coord(int index, float x, float y, float z) {
+  if (index < 0 || index >= _vertices.size())
+    throw std::runtime_error("下标非法,修改失败");
+  bind();
+  // 修改显存
+  std::vector<float> data = {x, y, z};
+  glBufferSubData(GL_ARRAY_BUFFER, index * sizeof(vertex) + 0,
+                  3 * sizeof(float), data.data());
+  // 同步cpu侧数据
+  _vertices[index]._x = x;
+  _vertices[index]._y = y;
+  _vertices[index]._z = z;
+  _vertices_data[index * 9] = x;
+  _vertices_data[index * 9 + 1] = y;
+  _vertices_data[index * 9 + 2] = z;
+  unbind();
+
+  debug_gmemory();
+};
+void mesh::update_vertex_color(int index, float r, float g, float b, float a) {
+  if (index < 0 || index >= _vertices.size())
+    throw std::runtime_error("下标非法,修改失败");
+  bind();
+  // 修改显存
+  std::vector<float> data = {r, g, b, a};
+  glBufferSubData(GL_ARRAY_BUFFER, index * sizeof(vertex) + 3 * sizeof(float),
+                  4 * sizeof(float), data.data());
+  // 同步cpu侧数据
+  _vertices[index]._r = r;
+  _vertices[index]._g = g;
+  _vertices[index]._b = b;
+  _vertices[index]._a = a;
+  _vertices_data[index * 9 + 3] = r;
+  _vertices_data[index * 9 + 4] = g;
+  _vertices_data[index * 9 + 6] = b;
+  _vertices_data[index * 9 + 7] = a;
+  unbind();
+};
+void mesh::update_vertex_uv(int index, float u, float v) {
+  if (index < 0 || index >= _vertices.size())
+    throw std::runtime_error("下标非法,修改失败");
+  bind();
+  // 修改显存
+  std::vector<float> data = {u, v};
+  glBufferSubData(GL_ARRAY_BUFFER, index * sizeof(vertex) + 7 * sizeof(float),
+                  2 * sizeof(float), data.data());
+  // 同步cpu侧数据
+  _vertices[index]._u = u;
+  _vertices[index]._v = v;
+  _vertices_data[index * 9 + 7] = u;
+  _vertices_data[index * 9 + 8] = v;
+  unbind();
+};
+
 void mesh::del_vertex(int index, bool align_mem, bool auto_elm_fix) {
   if (index < 0 || index >= _vertices.size()) {
     throw std::runtime_error("index非法,顶点删除失败");

@@ -35,6 +35,7 @@ struct mousewheelevent {
   GLFWwindow *window;
   double dx, dy;
 };
+
 struct triangle {
   vertex *v1, *v2, *v3;
   unsigned int e1, e2, e3;
@@ -51,10 +52,6 @@ class glwindow {
   static void onmousewheel(GLFWwindow *window, double dx, double dy);
 
 #ifdef __unix
-  // 线程锁
-  std::mutex mtx;
-  // 条件变量
-  std::condition_variable cv;
   void render();
 #endif //__unix
 
@@ -114,6 +111,10 @@ public:
   float background_color[4]{0.23f, 0.23f, 0.23f, 1.0f};
 #ifdef __unix
   std::thread _eventloop_thread;
+  // 线程锁
+  std::mutex mtx;
+  // 条件变量
+  std::condition_variable cv;
   void getglcontext();
   void releaseglcontext();
 #endif //__unix

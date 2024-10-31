@@ -51,6 +51,11 @@ public:
   void put_vertices(std::vector<vertex> &v, int index = -1);
   void put_vertices(std::vector<vertex> &&v, int index = -1);
 
+  // 更新顶点数据
+  void update_vertex_coord(int index, float x, float y, float z);
+  void update_vertex_color(int index, float r, float g, float b, float a);
+  void update_vertex_uv(int index, float u, float v);
+
   // 移除顶点
   void del_vertex(int index, bool align_mem = true, bool auto_elm_fix = true);
   void del_vertex(vertex &v, bool align_mem = true, bool auto_elm_fix = true);

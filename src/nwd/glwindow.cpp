@@ -245,11 +245,14 @@ void glwindow::enable_alpha_blend() {
 #ifdef __unix
 void glwindow::render() {
   while (true) {
-    std::unique_lock<std::mutex> lock(mtx);
-    cv.wait(lock, [this]() { return visible; });
-    glfwMakeContextCurrent(window);
+    {
+      std::unique_lock<std::mutex> lock(mtx);
+      cv.wait(lock, [this]() { return visible; });
+      glfwMakeContextCurrent(window);
+    }
     while (visible && !glfwWindowShouldClose(window)) {
-      // 绘制背景颜色
+      // std::cout << "绘制" << std::endl;
+      //  绘制背景颜色
       glClearColor(background_color[0], background_color[1],
                    background_color[2], background_color[3]);
       glClear(GL_COLOR_BUFFER_BIT);
@@ -265,10 +268,10 @@ void glwindow::render() {
       glfwSwapBuffers(window);
       glfwPollEvents();
     }
+    glfwMakeContextCurrent(nullptr);
     // 关闭窗口后再隐藏一次窗口并完成一次事件循环保证生效
     glfwHideWindow(window);
     glfwPollEvents();
-    glfwMakeContextCurrent(nullptr);
   }
 };
 void glwindow::getglcontext() { glfwMakeContextCurrent(window); };
