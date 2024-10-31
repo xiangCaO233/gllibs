@@ -6,6 +6,7 @@
 #include <vector>
 
 class mesh {
+
   void debug_gmemory();
   void debug_vertex_data();
   void debug_gememory();

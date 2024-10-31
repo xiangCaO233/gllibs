@@ -35,6 +35,10 @@ struct mousewheelevent {
   GLFWwindow *window;
   double dx, dy;
 };
+struct triangle {
+  vertex *v1, *v2, *v3;
+  unsigned int e1, e2, e3;
+};
 
 class glwindow {
   // 静态回调函数
@@ -61,9 +65,11 @@ class glwindow {
   static std::condition_variable cv;
   static std::vector<glwindow *> windows;
 
+  // 查询是否有需要渲染的窗口
   static bool shoud_render();
 
 public:
+  // macos特有的主线程阻塞渲染
   static void start_render();
 #endif //__APPLE__
 

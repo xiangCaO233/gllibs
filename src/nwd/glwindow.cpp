@@ -212,6 +212,7 @@ glwindow::glwindow(int w, int h, std::string title) {
 
 // 析构函数
 glwindow::~glwindow() {
+  glfwDestroyWindow(window);
   delete _shader;
   delete _mesh;
 }
