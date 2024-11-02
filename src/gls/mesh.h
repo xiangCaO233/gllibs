@@ -53,8 +53,11 @@ public:
 
   // 更新顶点数据
   void update_vertex_coord(int index, float x, float y, float z);
+  void update_vertex_rcoord(int index, float rx, float ry, float rz);
   void update_vertex_color(int index, float r, float g, float b, float a);
+  void update_vertex_rcolor(int index, float rr, float rg, float rb, float ra);
   void update_vertex_uv(int index, float u, float v);
+  void update_vertex_ruv(int index, float ru, float rv);
 
   // 移除顶点
   void del_vertex(int index, bool align_mem = true, bool auto_elm_fix = true);

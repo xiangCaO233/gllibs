@@ -16,9 +16,15 @@ public:
 
 protected:
   void draw_frame() override {
-    // 绘制所有顶点元素(三角形方式)
-    glDrawElements(GL_TRIANGLES, _mesh->_elements.size(), GL_UNSIGNED_INT,
+    glDrawElements(GL_LINES, _mesh->_elements.size(), GL_UNSIGNED_INT,
                    (void *)0);
+    glLineWidth(60.0f);
+    // 绘制所有顶点元素(三角形方式)
+    // glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, (void *)0);
+    _mesh->update_vertex_rcoord(0, 0.0001, 0.0001, 0);
+    _mesh->update_vertex_rcoord(1, -0.0001, 0.0001, 0);
+    _mesh->update_vertex_rcoord(2, -0.0001, -0.0001, 0);
+    _mesh->update_vertex_rcoord(3, 0.0001, -0.0001, 0);
   }
   void resize_event(resizeevent e) override {
     std::cout << "size:[" + std::to_string(e.w) + "," + std::to_string(e.h) +
@@ -55,6 +61,7 @@ protected:
 
 #ifdef __APPLE__
 mywindow *w;
+auto main_id = std::this_thread::get_id();
 void moved_main() {
   std::cout << "设置窗口可见" << std::endl;
   // usleep(1000000 * 2);
@@ -66,12 +73,13 @@ int main() {
 #ifdef __APPLE__
   std::cout << "创建窗口" << std::endl;
   w = new mywindow(800, 600, "test");
-  // 向mesh添加三个顶点(x,y,z,r,g,b,a)
-  w->_mesh->put_vertices({{-0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
-                          {0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f},
-                          {0.0f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f}});
+  // 向mesh添加顶点(x,y,z,r,g,b,a)
+  w->_mesh->put_vertices({{-1.0f, -1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f},
+                          {1.0f, -1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f},
+                          {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f},
+                          {-1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f}});
   // 添加绘制元素下标(0,1,2)前三个顶点
-  w->_mesh->add_elements({0, 1, 2});
+  w->_mesh->add_elements({0, 1, 2, 0, 2, 3});
 
   // 主线程必须堵塞,转移main到moved_main中运行
   std::thread t(&moved_main);
@@ -86,7 +94,7 @@ int main() {
   mywindow *w = new mywindow(800, 600, "test");
   // 获取gl上下文
   w->getglcontext();
-  // 向mesh添加三个顶点(x,y,z,r,g,b,a)
+  // 向mesh添加顶点(x,y,z,r,g,b,a)
   w->_mesh->put_vertices({
       {-1.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
       {1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f},

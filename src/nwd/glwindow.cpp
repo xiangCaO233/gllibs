@@ -114,7 +114,6 @@ void glwindow::start_render() {
         }
         // std::cout << "开始渲染" << std::endl;
         glfwMakeContextCurrent(w->window);
-        // 绘制背景颜色
         glClearColor(w->background_color[0], w->background_color[1],
                      w->background_color[2], w->background_color[3]);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -194,7 +193,7 @@ glwindow::glwindow(int w, int h, std::string title) {
   _shader = new shader("../assets/shader/vertex.glsl",
                        "../assets/shader/fragment.glsl");
   // 初始化mesh
-  _mesh = new mesh();
+  _mesh = new mesh(GL_DYNAMIC_DRAW);
   // 绑定回调函数
   glfwSetFramebufferSizeCallback(window, onresize);
   glfwSetKeyCallback(window, onkeyinput);

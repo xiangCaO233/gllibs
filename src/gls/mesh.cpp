@@ -265,8 +265,12 @@ void mesh::update_vertex_coord(int index, float x, float y, float z) {
   _vertices_data[index * 9 + 2] = z;
   unbind();
 
-  debug_gmemory();
+  // debug_gmemory();
 };
+void mesh::update_vertex_rcoord(int index, float rx, float ry, float rz) {
+  update_vertex_coord(index, _vertices[index]._x + rx, _vertices[index]._y + ry,
+                      _vertices[index]._z + rz);
+}
 void mesh::update_vertex_color(int index, float r, float g, float b, float a) {
   if (index < 0 || index >= _vertices.size())
     throw std::runtime_error("下标非法,修改失败");
@@ -286,6 +290,11 @@ void mesh::update_vertex_color(int index, float r, float g, float b, float a) {
   _vertices_data[index * 9 + 7] = a;
   unbind();
 };
+void mesh::update_vertex_rcolor(int index, float rr, float rg, float rb,
+                                float ra) {
+  update_vertex_color(index, _vertices[index]._r + rr, _vertices[index]._g + rg,
+                      _vertices[index]._b + rb, _vertices[index]._a + ra);
+};
 void mesh::update_vertex_uv(int index, float u, float v) {
   if (index < 0 || index >= _vertices.size())
     throw std::runtime_error("下标非法,修改失败");
@@ -302,6 +311,9 @@ void mesh::update_vertex_uv(int index, float u, float v) {
   unbind();
 };
 
+void mesh::update_vertex_ruv(int index, float ru, float rv) {
+  update_vertex_uv(index, _vertices[index]._u + ru, _vertices[index]._v + rv);
+};
 void mesh::del_vertex(int index, bool align_mem, bool auto_elm_fix) {
   if (index < 0 || index >= _vertices.size()) {
     throw std::runtime_error("index非法,顶点删除失败");
